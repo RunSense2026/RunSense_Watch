@@ -1,0 +1,102 @@
+# ═══════════════════════════════════════════
+# Gradle
+# ═══════════════════════════════════════════
+.gradle/
+build/
+*/build/
+out/
+gradle-app.setting
+!gradle-wrapper.jar
+.gradletasknamecache
+
+# ═══════════════════════════════════════════
+# 로컬 설정
+# ═══════════════════════════════════════════
+local.properties
+*.properties.local
+secrets.properties
+keystore.properties
+
+# ═══════════════════════════════════════════
+# Android Studio / IntelliJ
+# ═══════════════════════════════════════════
+.idea/*
+!.idea/codeStyles/
+!.idea/runConfigurations.xml
+*.iml
+*.ipr
+*.iws
+.navigation/
+captures/
+.cxx/
+.externalNativeBuild/
+
+# ═══════════════════════════════════════════
+# 빌드 결과물 
+# ═══════════════════════════════════════════
+*.apk
+*.aab
+*.ap_
+*.dex
+output-metadata.json
+mapping/
+*.txt.map
+
+# ═══════════════════════════════════════════
+# 서명 키 / 인증서
+# ═══════════════════════════════════════════
+*.jks
+*.keystore
+*.p12
+*.pem
+
+# ═══════════════════════════════════════════
+# Kotlin / KSP / KAPT
+# ═══════════════════════════════════════════
+.kotlin/
+kapt/
+ksp/
+
+# ═══════════════════════════════════════════
+# Compose 미리보기 스크린샷 테스트 결과
+# ═══════════════════════════════════════════
+**/build/reports/screenshotTest/
+**/build/outputs/androidTest-results/
+
+# ═══════════════════════════════════════════
+# Wear OS 에뮬레이터 / 페어링 관련
+# ═══════════════════════════════════════════
+*.avd/
+.android/avd/
+
+# ═══════════════════════════════════════════
+# Lint / 정적 분석 리포트
+# ═══════════════════════════════════════════
+lint/intermediates/
+lint/generated/
+lint/outputs/
+lint/tmp/
+*/lint-results-*.html
+*/lint-results-*.xml
+detekt-reports/
+
+# ═══════════════════════════════════════════
+# 로그 / 캐시
+# ═══════════════════════════════════════════
+*.log
+*.hprof
+*.cache
+
+# ═══════════════════════════════════════════
+# OS별 시스템 파일
+# ═══════════════════════════════════════════
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+# Linux
+*~
