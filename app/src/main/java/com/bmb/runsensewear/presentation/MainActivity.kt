@@ -10,6 +10,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
+import com.bmb.runsensewear.data.sensor.HeartRatePermission
 import com.bmb.runsensewear.presentation.navigation.WearNavGraph
 import com.bmb.runsensewear.presentation.theme.RunSenseWearTheme
 
@@ -18,7 +19,8 @@ import com.bmb.runsensewear.presentation.theme.RunSenseWearTheme
  * 매니페스트 선언만으로는 부족하고 사용자가 직접 허용해야 하는 dangerous 권한들입니다.
  */
 private val RequiredPermissions: Array<String> = buildList {
-    add(Manifest.permission.BODY_SENSORS)
+    // API 36부터는 BODY_SENSORS 대신 health.READ_HEART_RATE를 요청해야 합니다.
+    add(HeartRatePermission)
     add(Manifest.permission.ACTIVITY_RECOGNITION)
     add(Manifest.permission.ACCESS_FINE_LOCATION)
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {

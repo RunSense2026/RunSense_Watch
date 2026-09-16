@@ -1,11 +1,18 @@
 package com.bmb.runsensewear.presentation.navigation
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.navigation.NavType
 import androidx.navigation.navArgument
 import androidx.wear.compose.navigation.SwipeDismissableNavHost
 import androidx.wear.compose.navigation.composable
 import androidx.wear.compose.navigation.rememberSwipeDismissableNavController
+import com.bmb.runsensewear.presentation.sensor.rememberHeartRate
+import com.bmb.runsensewear.presentation.sensor.rememberHeartRateSensorReady
 import com.bmb.runsensewear.presentation.screens.AiCoachScreen
 import com.bmb.runsensewear.presentation.screens.FormSummaryScreen
 import com.bmb.runsensewear.presentation.screens.HeartRateScreen
@@ -37,6 +44,14 @@ object RunSenseRoutes {
      *   들어오는 마지막 페이지일 때는 false라 화면이 스스로 닫히지 않습니다.
      */
     fun aiCoach(autoDismiss: Boolean): String = "ai_coach?$ARG_AUTO_DISMISS=$autoDismiss"
+
+    /**
+     * 심박 센서를 켜 둘 화면들.
+     * 02 센서확인부터 켜 두면 러닝이 시작될 때쯤 첫 측정값이 이미 안정돼 있습니다.
+     */
+    val SensorActiveRoutes: Set<String> = setOf(
+        SENSOR_CHECK, RUNNING, HEART_RATE, FORM_SUMMARY, AI_COACH, PAUSED
+    )
 }
 
 /**
@@ -59,6 +74,21 @@ object RunSenseRoutes {
 fun WearNavGraph() {
     val navController = rememberSwipeDismissableNavController()
 
+    // 러닝 관련 화면에 있을 때만 심박 센서를 켭니다. 대기/완료 화면에서는 꺼서 배터리를 아낍니다.
+    // 스와이프로 화면을 밀어 닫고 나가는 경우까지 잡아야 해서 현재 경로에서 파생시킵니다.
+    var currentRoute by remember { mutableStateOf<String?>(null) }
+    LaunchedEffect(navController) {
+        navController.currentBackStackEntryFlow.collect {
+            currentRoute = it.destination.route
+        }
+    }
+    val sensorActive = currentRoute in RunSenseRoutes.SensorActiveRoutes
+
+    // NavHost 바깥에서 한 번만 구독하므로, 러닝중 ↔ 심박 ↔ 폼요약을 오가도
+    // 센서가 매번 다시 잡히지 않고 존별 체류시간도 이어서 쌓입니다.
+    val heartRate = rememberHeartRate(enabled = sensorActive)
+    val heartRateReady = rememberHeartRateSensorReady()
+
     SwipeDismissableNavHost(
         navController = navController,
         startDestination = RunSenseRoutes.HOME
@@ -68,7 +98,8 @@ fun WearNavGraph() {
             HomeScreen(
                 onStartRunClick = {
                     navController.navigate(RunSenseRoutes.SENSOR_CHECK)
-                }
+                },
+                heartRateReady = heartRateReady
             )
         }
 
@@ -96,7 +127,8 @@ fun WearNavGraph() {
                 onAiCoachTriggered = {
                     // ViewModel에서 코칭 메시지 생성 이벤트가 오면 이걸 호출
                     navController.navigate(RunSenseRoutes.aiCoach(autoDismiss = true))
-                }
+                },
+                heartRate = heartRate.bpm
             )
         }
 
@@ -108,7 +140,11 @@ fun WearNavGraph() {
                 },
                 onSwipeBackToRunning = {
                     navController.popBackStack()
-                }
+                },
+                heartRate = heartRate.bpm,
+                currentZone = heartRate.zone,
+                zoneShares = heartRate.zoneShares,
+                statusLabel = heartRate.statusLabel
             )
         }
 

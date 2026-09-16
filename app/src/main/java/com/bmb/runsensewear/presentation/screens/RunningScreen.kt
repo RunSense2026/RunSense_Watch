@@ -63,9 +63,10 @@ internal fun formatElapsed(totalSeconds: Int): String {
  *
  * @param onAiCoachTriggered 코칭 메시지 생성 이벤트가 오면 ViewModel이 호출합니다.
  *
- * TODO: elapsedSeconds / paceText / distanceKm / heartRate 는 지금 화면 안에서
- *       임시로 만들고 있습니다. Health Services ExerciseClient 연동 후
- *       ViewModel state로 끌어올리세요.
+ * heartRate는 워치 내장 심박 센서에서 실제 값이 들어옵니다(WearNavGraph에서 주입).
+ *
+ * TODO: elapsedSeconds / paceText / distanceKm 는 아직 화면 안에서 임시로 만들고 있습니다.
+ *       Health Services ExerciseClient 연동 후 ViewModel state로 끌어올리세요.
  */
 @Composable
 fun RunningScreen(
@@ -137,7 +138,7 @@ fun RunningScreen(
                     MetricColumn(value = formatElapsed(elapsedSeconds), label = "시간")
                     MetricDivider()
                     MetricColumn(
-                        value = heartRate.toString(),
+                        value = if (heartRate > 0) heartRate.toString() else "--",
                         label = "BPM",
                         valueColor = RunSenseColors.Bad
                     )

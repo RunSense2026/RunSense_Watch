@@ -40,15 +40,18 @@ import java.util.Calendar
  *
  * 시안: RUNSENSE 라벨 · 큰 현재 시각 · 센서 연결 칩 2개 · 원형 "시작 / RUN" 버튼.
  *
+ * 심박은 별도 밴드 없이 워치 내장 센서로 측정하므로, 두 번째 칩은
+ * 페어링 상태가 아니라 "이 워치에서 심박을 읽을 수 있는가"를 나타냅니다.
+ *
  * @param insolesConnected 좌우 인솔 연결 여부
- * @param heartBandConnected 심박밴드 연결 여부
+ * @param heartRateReady 워치 심박 센서 사용 가능 여부 (권한 + 기기 지원)
  */
 @Composable
 fun HomeScreen(
     onStartRunClick: () -> Unit,
     modifier: Modifier = Modifier,
     insolesConnected: Boolean = false,
-    heartBandConnected: Boolean = false
+    heartRateReady: Boolean = false
 ) {
     val clock = rememberClockText()
 
@@ -92,10 +95,10 @@ fun HomeScreen(
                     else RunSenseColors.TextTertiary
                 )
                 StatusChip(
-                    label = "심박밴드",
-                    dotColor = if (heartBandConnected) RunSenseColors.Good
+                    label = "워치 심박",
+                    dotColor = if (heartRateReady) RunSenseColors.Good
                     else RunSenseColors.TextTertiary,
-                    pulsing = heartBandConnected
+                    pulsing = heartRateReady
                 )
             }
 
@@ -174,7 +177,7 @@ private fun HomeScreenPreview() {
         HomeScreen(
             onStartRunClick = {},
             insolesConnected = true,
-            heartBandConnected = true
+            heartRateReady = true
         )
     }
 }

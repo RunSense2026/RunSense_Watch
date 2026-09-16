@@ -29,7 +29,7 @@ import com.bmb.runsensewear.presentation.theme.RunSenseColors
 import com.bmb.runsensewear.presentation.theme.RunSenseWearTheme
 import kotlinx.coroutines.delay
 
-/** 02 화면의 센서 항목. 시안은 좌우 인솔 + 심박밴드 3종입니다. */
+/** 02 화면의 센서 항목. 워치 내장 심박은 페어링이 필요 없어 좌우 인솔 2종만 확인합니다. */
 data class SensorItem(
     val badge: String,
     val label: String,

@@ -47,10 +47,14 @@ private val ZoneNames = listOf("회복", "지구력", "유산소", "무산소", 
  * 시안: 뛰는 하트 + 큰 심박수 · "BPM · LTHR n" · "Z3 · 유산소" 뱃지 ·
  * 존별 체류시간 막대 5개 · 좌우 화살표 · 페이지 점 4개.
  *
+ * 심박수는 워치 내장 광학 센서(Health Services MeasureClient)에서 받아옵니다.
+ *
  * @param currentZone 1~5. 0이면 아직 측정 전.
  * @param zoneShares 존별 체류 비율 0~1. 막대 높이로 표현합니다.
+ * @param statusLabel 측정이 안 될 때 존 뱃지 자리에 띄울 안내 문구. 정상 측정 중이면 null.
  *
- * TODO: heartRate / currentZone / zoneShares 를 HeartRateSensorManager 구독 결과로 교체하세요.
+ * TODO: lactateThresholdHr(젖산역치 심박)은 사용자 프로필/훈련 이력이 필요합니다.
+ *       폰 앱에서 값을 받아오도록 PhoneSyncManager 연동 시 채우세요.
  */
 @Composable
 fun HeartRateScreen(
@@ -60,7 +64,8 @@ fun HeartRateScreen(
     heartRate: Int = 0,
     currentZone: Int = 0,
     lactateThresholdHr: Int = 0,
-    zoneShares: List<Float> = listOf(0f, 0f, 0f, 0f, 0f)
+    zoneShares: List<Float> = listOf(0f, 0f, 0f, 0f, 0f),
+    statusLabel: String? = null
 ) {
     RunSenseScreen(
         modifier = modifier.onSwipeLeft { onSwipeToFormSummary() },
@@ -86,7 +91,8 @@ fun HeartRateScreen(
                         modifier = Modifier.scale(beat)
                     )
                     Text(
-                        text = heartRate.toString(),
+                        // 아직 한 번도 못 읽었으면 0 대신 자리표시자를 둡니다.
+                        text = if (heartRate > 0) heartRate.toString() else "--",
                         style = MaterialTheme.typography.display2,
                         color = RunSenseColors.TextPrimary
                     )
@@ -98,10 +104,12 @@ fun HeartRateScreen(
                     color = RunSenseColors.TextTertiary
                 )
 
+                // 센서가 값을 못 주는 동안에는 존 대신 이유를 보여줍니다.
+                val showZone = statusLabel == null && currentZone in 1..5
                 StatusBadge(
-                    text = if (currentZone in 1..5) "Z$currentZone · ${ZoneNames[currentZone - 1]}"
-                    else "측정 대기",
-                    color = if (currentZone in 1..5) RunSenseColors.Purple300
+                    text = if (showZone) "Z$currentZone · ${ZoneNames[currentZone - 1]}"
+                    else statusLabel ?: "측정 대기",
+                    color = if (showZone) RunSenseColors.Purple300
                     else RunSenseColors.TextTertiary,
                     modifier = Modifier.padding(top = 4.dp)
                 )

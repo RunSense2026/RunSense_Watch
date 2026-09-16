@@ -166,7 +166,7 @@ fun GlassCard(
     }
 }
 
-/** 시안 01의 센서 상태 칩 ("인솔 L·R", "심박밴드") */
+/** 시안 01의 센서 상태 칩 ("인솔 L·R", "워치 심박") */
 @Composable
 fun StatusChip(
     label: String,

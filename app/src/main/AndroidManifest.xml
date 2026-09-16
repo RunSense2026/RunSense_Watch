@@ -3,8 +3,15 @@
 
     <uses-permission android:name="android.permission.WAKE_LOCK" />
 
-    <!-- 심박 센서 (Health Services ExerciseClient) -->
-    <uses-permission android:name="android.permission.BODY_SENSORS" />
+    <!--
+        워치 내장 심박 센서 (Health Services MeasureClient).
+        Wear OS 6(API 36)부터 BODY_SENSORS가 health 권한으로 대체되어 둘 다 선언합니다.
+        https://developer.android.com/training/wearables/versions/6/changes
+    -->
+    <uses-permission
+        android:name="android.permission.BODY_SENSORS"
+        android:maxSdkVersion="35" />
+    <uses-permission android:name="android.permission.health.READ_HEART_RATE" />
     <!-- 걸음/러닝 감지, 케이던스 등 모션 기반 지표 -->
     <uses-permission android:name="android.permission.ACTIVITY_RECOGNITION" />
     <!-- 거리·페이스 계산용 GPS -->
