@@ -1,6 +1,8 @@
 package com.bmb.runsensewear.presentation.navigation
 
 import androidx.compose.runtime.Composable
+import androidx.navigation.NavType
+import androidx.navigation.navArgument
 import androidx.wear.compose.navigation.SwipeDismissableNavHost
 import androidx.wear.compose.navigation.composable
 import androidx.wear.compose.navigation.rememberSwipeDismissableNavController
@@ -23,16 +25,25 @@ object RunSenseRoutes {
     const val RUNNING = "running"              // 03 러닝 중
     const val HEART_RATE = "heart_rate"        // 04 심박 상세
     const val FORM_SUMMARY = "form_summary"    // 05 폼 요약
-    const val AI_COACH = "ai_coach"            // 06 AI 코치 알림
     const val PAUSED = "paused"                // 07 일시정지
     const val RUN_COMPLETE = "run_complete"    // 08 러닝 완료
+
+    /** 06 AI 코치 알림. 자동으로 닫힐지 여부를 인자로 받습니다. */
+    const val ARG_AUTO_DISMISS = "auto"
+    const val AI_COACH = "ai_coach?$ARG_AUTO_DISMISS={$ARG_AUTO_DISMISS}"
+
+    /**
+     * @param autoDismiss 러닝 중 코칭 이벤트로 띄울 때 true. 폼 요약에서 밀어서
+     *   들어오는 마지막 페이지일 때는 false라 화면이 스스로 닫히지 않습니다.
+     */
+    fun aiCoach(autoDismiss: Boolean): String = "ai_coach?$ARG_AUTO_DISMISS=$autoDismiss"
 }
 
 /**
  * 워치 앱 전체 화면 흐름.
  *
  *  01 대기 --[시작]--> 02 센서확인 --[연결완료]--> 03 러닝중
- *  03 러닝중 <-- 스와이프 --> 04 심박상세 <-- 스와이프 --> 05 폼요약
+ *  03 러닝중 <-- 스와이프 --> 04 심박상세 <-- 스와이프 --> 05 폼요약 <-- 스와이프 --> 06 AI코치
  *  03 러닝중 --[감지시]--> 06 AI코치 (몇 초 후 자동으로 03으로 복귀)
  *  03 러닝중 --[일시정지 버튼]--> 07 일시정지
  *  07 일시정지 --[재개]--> 03 러닝중 (뒤로가기)
@@ -41,9 +52,8 @@ object RunSenseRoutes {
  * WearOS 관례상 뒤로가기는 "오른쪽 스와이프로 화면을 밀어서 닫기" 제스처를
  * 쓰기 때문에, 일반 NavHost 대신 SwipeDismissableNavHost를 사용합니다.
  *
- * ⚠️ 각 화면 Composable(HomeScreen, RunningScreen 등)의 파라미터 이름은
- * 이미 만들어두신 파일과 다를 수 있습니다. 아래 콜백 파라미터 이름을
- * 실제 화면 파일에 맞춰 조정해주세요. (이름만 다를 뿐 구조는 그대로 쓰시면 됩니다)
+ * 각 화면 Composable은 지표 값(거리·심박·폼 점수 등)을 기본값 있는 파라미터로
+ * 받습니다. ViewModel이 생기면 여기서 state를 읽어 각 화면에 넘겨주세요.
  */
 @Composable
 fun WearNavGraph() {
@@ -85,7 +95,7 @@ fun WearNavGraph() {
                 },
                 onAiCoachTriggered = {
                     // ViewModel에서 코칭 메시지 생성 이벤트가 오면 이걸 호출
-                    navController.navigate(RunSenseRoutes.AI_COACH)
+                    navController.navigate(RunSenseRoutes.aiCoach(autoDismiss = true))
                 }
             )
         }
@@ -105,15 +115,33 @@ fun WearNavGraph() {
         // 05 폼 요약
         composable(RunSenseRoutes.FORM_SUMMARY) {
             FormSummaryScreen(
+                onSwipeToAiCoach = {
+                    // 마지막 페이지이므로 스스로 닫히지 않게 autoDismiss = false
+                    navController.navigate(RunSenseRoutes.aiCoach(autoDismiss = false))
+                },
                 onSwipeBack = {
                     navController.popBackStack()
                 }
             )
         }
 
-        // 06 AI 코치 알림 (몇 초 뒤 자동으로 닫히는 알림성 화면)
-        composable(RunSenseRoutes.AI_COACH) {
+        // 06 AI 코치 알림
+        composable(
+            route = RunSenseRoutes.AI_COACH,
+            arguments = listOf(
+                navArgument(RunSenseRoutes.ARG_AUTO_DISMISS) {
+                    type = NavType.BoolType
+                    defaultValue = true
+                }
+            )
+        ) { entry ->
+            val autoDismiss = entry.arguments
+                ?.getBoolean(RunSenseRoutes.ARG_AUTO_DISMISS) ?: true
             AiCoachScreen(
+                onDismiss = {
+                    navController.popBackStack()
+                },
+                autoDismissMillis = if (autoDismiss) 5000L else null
             )
         }
 

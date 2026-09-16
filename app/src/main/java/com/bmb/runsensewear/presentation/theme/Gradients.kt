@@ -39,4 +39,12 @@ object RunSenseGradients {
     val PaceTextGradient = Brush.linearGradient(
         listOf(Color.White, RunSenseColors.Purple400, RunSenseColors.Purple300)
     )
+
+    /** AI 코치 말풍선 카드 (PrimaryAction보다 옅은 반투명 버전) */
+    val CoachCard = Brush.linearGradient(
+        listOf(
+            RunSenseColors.Purple700.copy(alpha = 0.32f),
+            RunSenseColors.Blue600.copy(alpha = 0.24f)
+        )
+    )
 }

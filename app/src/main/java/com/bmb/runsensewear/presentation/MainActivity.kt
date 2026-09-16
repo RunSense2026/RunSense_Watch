@@ -1,31 +1,30 @@
-/* While this template provides a good starting point for using Wear Compose, you can always
- * take a look at https://github.com/android/wear-os-samples/tree/main/ComposeStarter to find the
- * most up to date changes to the libraries and their usages.
- */
-
 package com.bmb.runsensewear.presentation
 
+import android.Manifest
+import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
-import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
-import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.Alignment
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.tooling.preview.Preview
-import androidx.wear.compose.material.MaterialTheme
-import androidx.wear.compose.material.Text
-import androidx.wear.compose.material.TimeText
-import androidx.wear.tooling.preview.devices.WearDevices
-import com.bmb.runsensewear.R
+import androidx.compose.runtime.LaunchedEffect
+import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import com.bmb.runsensewear.presentation.navigation.WearNavGraph
 import com.bmb.runsensewear.presentation.theme.RunSenseWearTheme
+
+/**
+ * 러닝 추적에 필요한 런타임 권한.
+ * 매니페스트 선언만으로는 부족하고 사용자가 직접 허용해야 하는 dangerous 권한들입니다.
+ */
+private val RequiredPermissions: Array<String> = buildList {
+    add(Manifest.permission.BODY_SENSORS)
+    add(Manifest.permission.ACTIVITY_RECOGNITION)
+    add(Manifest.permission.ACCESS_FINE_LOCATION)
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+        add(Manifest.permission.POST_NOTIFICATIONS)
+    }
+}.toTypedArray()
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -36,30 +35,32 @@ class MainActivity : ComponentActivity() {
         setTheme(android.R.style.Theme_DeviceDefault)
 
         setContent {
-            WearApp("Android")
+            WearApp()
         }
     }
 }
 
 @Composable
-fun WearApp(greetingName: String) {
+fun WearApp() {
     RunSenseWearTheme {
+        RequestRunPermissions()
         WearNavGraph()
     }
 }
 
+/**
+ * 앱 진입 시 한 번 권한을 요청합니다.
+ *
+ * TODO: 거절당했을 때의 안내 화면(설정으로 유도)은 아직 없습니다.
+ *       센서 연동 작업과 함께 SensorCheckScreen에서 처리하는 게 자연스럽습니다.
+ */
 @Composable
-fun Greeting(greetingName: String) {
-    Text(
-        modifier = Modifier.fillMaxWidth(),
-        textAlign = TextAlign.Center,
-        color = MaterialTheme.colors.primary,
-        text = stringResource(R.string.hello_world, greetingName)
-    )
-}
+private fun RequestRunPermissions() {
+    val launcher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestMultiplePermissions()
+    ) { /* 결과 처리는 센서 연동 시 SensorCheckScreen에서 */ }
 
-@Preview(device = WearDevices.SMALL_ROUND, showSystemUi = true)
-@Composable
-fun DefaultPreview() {
-    WearApp("Preview Android")
+    LaunchedEffect(Unit) {
+        launcher.launch(RequiredPermissions)
+    }
 }

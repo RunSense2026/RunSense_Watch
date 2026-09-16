@@ -3,7 +3,23 @@
 
     <uses-permission android:name="android.permission.WAKE_LOCK" />
 
+    <!-- 심박 센서 (Health Services ExerciseClient) -->
+    <uses-permission android:name="android.permission.BODY_SENSORS" />
+    <!-- 걸음/러닝 감지, 케이던스 등 모션 기반 지표 -->
+    <uses-permission android:name="android.permission.ACTIVITY_RECOGNITION" />
+    <!-- 거리·페이스 계산용 GPS -->
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+    <!-- 화면이 꺼진 상태에서도 러닝을 계속 추적하기 위한 포그라운드 서비스 -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_HEALTH" />
+    <!-- 포그라운드 서비스 알림 (Android 13+) -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+
     <uses-feature android:name="android.hardware.type.watch" />
+    <uses-feature
+        android:name="android.hardware.sensor.heartrate"
+        android:required="false" />
 
     <application
         android:allowBackup="true"
