@@ -1,5 +1,11 @@
 package com.bmb.runsensewear.presentation.screens
 
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.ExperimentalAnimationApi
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -7,19 +13,17 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.wear.compose.material.MaterialTheme
 import androidx.wear.compose.material.Text
 import androidx.wear.tooling.preview.devices.WearDevices
+import com.bmb.runsensewear.data.run.PaceState
+import com.bmb.runsensewear.presentation.components.EdgeArc
 import com.bmb.runsensewear.presentation.components.MetricColumn
 import com.bmb.runsensewear.presentation.components.MetricDivider
 import com.bmb.runsensewear.presentation.components.PageDots
@@ -31,26 +35,21 @@ import com.bmb.runsensewear.presentation.components.SwipeArrows
 import com.bmb.runsensewear.presentation.components.onSwipeLeft
 import com.bmb.runsensewear.presentation.theme.RunSenseColors
 import com.bmb.runsensewear.presentation.theme.RunSenseGradients
+import com.bmb.runsensewear.presentation.theme.RunSenseNumbers
 import com.bmb.runsensewear.presentation.theme.RunSenseWearTheme
-import kotlinx.coroutines.delay
+import com.bmb.runsensewear.presentation.theme.isCompactWatch
 
 /** 러닝 중 ↔ 심박 ↔ 폼요약 ↔ AI코치 가로 페이지 수 (시안의 점 4개) */
 internal const val RUN_PAGE_COUNT = 4
 
-/** 페이스 상태. 시안의 "적정 페이스" 초록 뱃지에 대응합니다. */
-enum class PaceState(val label: String) {
-    TooSlow("페이스 느림"),
-    Good("적정 페이스"),
-    TooFast("페이스 빠름")
-}
-
-/** 초 단위 경과시간을 mm:ss 로 (한 시간 넘으면 h:mm:ss) */
-internal fun formatElapsed(totalSeconds: Int): String {
-    val h = totalSeconds / 3600
-    val m = (totalSeconds % 3600) / 60
-    val s = totalSeconds % 60
-    return if (h > 0) String.format("%d:%02d:%02d", h, m, s)
-    else String.format("%02d:%02d", m, s)
+/**
+ * 페이스 링 채움 비율 — 폰 앱 DashboardA의 PaceRing과 같은 공식입니다.
+ * 기준(목표 또는 평균)보다 30초 빠르면 1, 30초 느리면 0, 같으면 0.5.
+ */
+internal fun paceRingProgress(currentSecPerKm: Double?, referenceSecPerKm: Double?): Float {
+    if (currentSecPerKm == null || referenceSecPerKm == null || referenceSecPerKm <= 0) return 0.5f
+    val deviation = (currentSecPerKm - referenceSecPerKm).coerceIn(-30.0, 30.0)
+    return (0.5 + -deviation / 60.0).toFloat()
 }
 
 /**
@@ -58,41 +57,42 @@ internal fun formatElapsed(totalSeconds: Int): String {
  *
  * 시안: 상단 "페이스 / KM" 라벨 · 대형 그라데이션 페이스 · 상태 뱃지 ·
  * 거리/시간/심박 3분할 · 좌우 화살표 · 페이지 점 4개 · 원형 일시정지 버튼.
+ * 여기에 화면 가장자리를 따라 페이스 링(폰 앱의 Pace Hero 링과 같은 규칙)을 더했습니다.
  *
  * 왼쪽으로 밀면 04 심박 상세로, 오른쪽으로 밀면 뒤로가기(SwipeDismiss)입니다.
  *
- * @param onAiCoachTriggered 코칭 메시지 생성 이벤트가 오면 ViewModel이 호출합니다.
- *
- * heartRate는 워치 내장 심박 센서에서 실제 값이 들어옵니다(WearNavGraph에서 주입).
- *
- * TODO: elapsedSeconds / paceText / distanceKm 는 아직 화면 안에서 임시로 만들고 있습니다.
- *       Health Services ExerciseClient 연동 후 ViewModel state로 끌어올리세요.
+ * @param paceReferenceSecPerKm 링/뱃지 기준 페이스 — 폰에서 정한 목표, 없으면 세션 평균
  */
+@OptIn(ExperimentalAnimationApi::class)
 @Composable
 fun RunningScreen(
     onSwipeToHeartRate: () -> Unit,
     onPauseClick: () -> Unit,
-    @Suppress("UNUSED_PARAMETER") onAiCoachTriggered: () -> Unit,
     modifier: Modifier = Modifier,
-    paceText: String = "5'28\"",
+    paceText: String = "--'--\"",
     paceState: PaceState = PaceState.Good,
+    currentPaceSecPerKm: Double? = null,
+    paceReferenceSecPerKm: Double? = null,
     distanceKm: Double = 0.0,
-    heartRate: Int = 0
+    elapsedText: String = "00:00",
+    heartRate: Int = 0,
+    gpsReady: Boolean = false
 ) {
-    var elapsedSeconds by remember { mutableIntStateOf(0) }
-    LaunchedEffect(Unit) {
-        while (true) {
-            delay(1000)
-            elapsedSeconds++
-        }
-    }
+    // 40mm 워치(≈198dp)에서는 큰 숫자·버튼을 한 단계 줄여 세로로 다 들어가게 합니다.
+    val compact = isCompactWatch()
+    val heroSize = if (compact) 40.sp else 46.sp
+    val metricStyle = if (compact) RunSenseNumbers.metric.copy(fontSize = 18.sp) else RunSenseNumbers.metric
+    val gap = if (compact) 5.dp else 7.dp
 
     RunSenseScreen(
         modifier = modifier.onSwipeLeft { onSwipeToHeartRate() },
-        showTime = false
+        showTime = false,
+        decor = {
+            EdgeArc(progress = paceRingProgress(currentPaceSecPerKm, paceReferenceSecPerKm))
+        }
     ) {
         Box(modifier = Modifier.fillMaxSize()) {
-            SwipeArrows()
+            SwipeArrows(showLeft = false)
 
             Column(
                 modifier = Modifier.align(Alignment.Center),
@@ -103,21 +103,30 @@ fun RunningScreen(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(5.dp)
                 ) {
-                    PulsingDot(color = RunSenseColors.Purple300, size = 5.dp)
+                    PulsingDot(
+                        color = if (gpsReady) RunSenseColors.Good else RunSenseColors.Purple300,
+                        size = 5.dp
+                    )
                     Text(
-                        text = "페이스 / KM",
+                        text = if (gpsReady) "페이스 / KM · GPS" else "페이스 / KM",
                         style = MaterialTheme.typography.caption1,
                         color = RunSenseColors.TextTertiary
                     )
                 }
 
-                Text(
-                    // display1(60sp)은 40mm 워치(198dp)에서 좌우가 잘려 display2를 씁니다.
-                    text = paceText,
-                    style = MaterialTheme.typography.display2.merge(
-                        TextStyle(brush = RunSenseGradients.PaceTextGradient)
+                AnimatedContent(
+                    targetState = paceText,
+                    transitionSpec = { fadeIn(tween(220)).togetherWith(fadeOut(tween(120))) },
+                    label = "pace"
+                ) { value ->
+                    Text(
+                        // 40mm 워치(198dp)에서도 좌우가 잘리지 않는 크기
+                        text = value,
+                        style = RunSenseNumbers.hero.copy(fontSize = heroSize).merge(
+                            TextStyle(brush = RunSenseGradients.PaceTextGradient)
+                        )
                     )
-                )
+                }
 
                 StatusBadge(
                     text = paceState.label,
@@ -129,18 +138,19 @@ fun RunningScreen(
                 )
 
                 Row(
-                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    horizontalArrangement = Arrangement.spacedBy(if (compact) 8.dp else 10.dp),
                     verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier.padding(top = 8.dp)
+                    modifier = Modifier.padding(top = gap)
                 ) {
-                    MetricColumn(value = String.format("%.2f", distanceKm), label = "KM")
+                    MetricColumn(value = String.format("%.2f", distanceKm), label = "KM", valueStyle = metricStyle)
                     MetricDivider()
-                    MetricColumn(value = formatElapsed(elapsedSeconds), label = "시간")
+                    MetricColumn(value = elapsedText, label = "시간", valueStyle = metricStyle, animated = false)
                     MetricDivider()
                     MetricColumn(
                         value = if (heartRate > 0) heartRate.toString() else "--",
                         label = "BPM",
-                        valueColor = RunSenseColors.Bad
+                        valueColor = RunSenseColors.Bad,
+                        valueStyle = metricStyle
                     )
                 }
 
@@ -148,12 +158,13 @@ fun RunningScreen(
                 PageDots(
                     count = RUN_PAGE_COUNT,
                     selectedIndex = 0,
-                    modifier = Modifier.padding(top = 8.dp)
+                    modifier = Modifier.padding(top = gap)
                 )
 
                 PauseCircleButton(
                     onClick = onPauseClick,
-                    modifier = Modifier.padding(top = 5.dp)
+                    size = if (compact) 26.dp else 30.dp,
+                    modifier = Modifier.padding(top = if (compact) 4.dp else 5.dp)
                 )
             }
         }
@@ -167,9 +178,13 @@ private fun RunningScreenPreview() {
         RunningScreen(
             onSwipeToHeartRate = {},
             onPauseClick = {},
-            onAiCoachTriggered = {},
+            paceText = "5'28\"",
+            currentPaceSecPerKm = 328.0,
+            paceReferenceSecPerKm = 330.0,
             distanceKm = 3.24,
-            heartRate = 156
+            elapsedText = "17:48",
+            heartRate = 156,
+            gpsReady = true
         )
     }
 }

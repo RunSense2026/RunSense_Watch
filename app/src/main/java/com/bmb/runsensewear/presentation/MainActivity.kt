@@ -3,6 +3,7 @@ package com.bmb.runsensewear.presentation
 import android.Manifest
 import android.os.Build
 import android.os.Bundle
+import android.view.WindowManager
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
@@ -35,6 +36,8 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
 
         setTheme(android.R.style.Theme_DeviceDefault)
+        // 러닝 중 손목을 들었을 때 바로 지표가 보이도록 화면을 켜 둡니다. (앰비언트는 시스템이 처리)
+        window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
 
         setContent {
             WearApp()
@@ -52,15 +55,14 @@ fun WearApp() {
 
 /**
  * 앱 진입 시 한 번 권한을 요청합니다.
- *
- * TODO: 거절당했을 때의 안내 화면(설정으로 유도)은 아직 없습니다.
- *       센서 연동 작업과 함께 SensorCheckScreen에서 처리하는 게 자연스럽습니다.
+ * 결과는 대기화면이 다시 보일 때 [com.bmb.runsensewear.presentation.run.RunViewModel.refreshSensorReadiness]가
+ * 다시 확인해 "워치 심박" 칩에 반영합니다. 거절하면 심박 없이 시간·GPS만으로 러닝이 진행됩니다.
  */
 @Composable
 private fun RequestRunPermissions() {
     val launcher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestMultiplePermissions()
-    ) { /* 결과 처리는 센서 연동 시 SensorCheckScreen에서 */ }
+    ) { /* 결과는 HomeScreen 진입 시 refreshSensorReadiness()로 반영 */ }
 
     LaunchedEffect(Unit) {
         launcher.launch(RequiredPermissions)

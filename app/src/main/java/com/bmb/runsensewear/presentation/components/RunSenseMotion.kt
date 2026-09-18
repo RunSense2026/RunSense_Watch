@@ -1,13 +1,17 @@
 package com.bmb.runsensewear.presentation.components
 
+import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.InfiniteRepeatableSpec
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.StartOffset
 import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.keyframes
 import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
@@ -22,7 +26,9 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.scale
@@ -40,7 +46,7 @@ import com.bmb.runsensewear.presentation.theme.RunSenseGradients
 
 /**
  * 디자인 시안의 CSS @keyframes를 Compose 애니메이션으로 옮긴 모음.
- * rs-pulse / rs-beat / rs-shimmer / rs-wave / rs-spin / rs-timer / rs-ring
+ * rs-pulse / rs-beat / rs-shimmer / rs-wave / rs-spin / rs-timer / rs-ring + 워치용 추가(edge arc, pop-in)
  */
 
 /** rs-pulse — 연결 상태 점이 커졌다 작아지는 표시 */
@@ -75,21 +81,25 @@ fun PulsingDot(
     )
 }
 
-/** rs-beat — 심박에 맞춰 두 번 튀는 배율. 하트 아이콘에 scale로 적용합니다. */
+/**
+ * rs-beat — 심박에 맞춰 두 번 튀는 배율. 하트 아이콘에 scale로 적용합니다.
+ * @param bpm 실제 심박수에 맞춰 박동 주기를 정합니다 (0이면 60bpm 기준).
+ */
 @Composable
-fun rememberBeatScale(): Float {
+fun rememberBeatScale(bpm: Int = 0): Float {
+    val period = if (bpm in 30..220) (60_000 / bpm) else 1000
     val transition = rememberInfiniteTransition(label = "beat")
     val scale by transition.animateFloat(
         initialValue = 1f,
         targetValue = 1f,
         animationSpec = infiniteRepeatable(
             animation = keyframes {
-                durationMillis = 1000
+                durationMillis = period
                 1f at 0
-                1.18f at 150
-                1f at 300
-                1.08f at 450
-                1f at 700
+                1.18f at (period * 0.15f).toInt()
+                1f at (period * 0.30f).toInt()
+                1.08f at (period * 0.45f).toInt()
+                1f at (period * 0.70f).toInt()
             }
         ),
         label = "beatScale"
@@ -110,7 +120,7 @@ fun ShimmerGlow(
     val transition = rememberInfiniteTransition(label = "shimmer")
     val glow by transition.animateFloat(
         initialValue = 0.18f,
-        targetValue = 0.36f,
+        targetValue = 0.40f,
         animationSpec = infiniteRepeatable(tween(1400), RepeatMode.Reverse),
         label = "glowAlpha"
     )
@@ -130,7 +140,8 @@ fun ShimmerGlow(
 @Composable
 fun VoiceWaveBars(
     modifier: Modifier = Modifier,
-    barHeight: Dp = 22.dp
+    barHeight: Dp = 22.dp,
+    active: Boolean = true
 ) {
     val transition = rememberInfiniteTransition(label = "wave")
     val colors = listOf(
@@ -151,11 +162,15 @@ fun VoiceWaveBars(
                 repeatMode = RepeatMode.Reverse,
                 initialStartOffset = StartOffset(index * 120)
             )
-            val scaleY by transition.animateFloat(
+            val animated by transition.animateFloat(
                 initialValue = 0.35f,
                 targetValue = 1f,
                 animationSpec = spec,
                 label = "wave$index"
+            )
+            val scaleY by animateFloatAsState(
+                targetValue = if (active) animated else 0.25f,
+                label = "waveActive$index"
             )
             Box(
                 modifier = Modifier
@@ -197,9 +212,12 @@ fun RunSenseSpinner(
             style = stroke
         )
         drawArc(
-            color = RunSenseColors.Purple300,
+            brush = Brush.sweepGradient(
+                listOf(Color.Transparent, RunSenseColors.Purple300, RunSenseColors.Blue500),
+                center = Offset(this.size.width / 2, this.size.height / 2)
+            ),
             startAngle = angle,
-            sweepAngle = 90f,
+            sweepAngle = 110f,
             useCenter = false,
             topLeft = topLeft,
             size = arcSize,
@@ -208,19 +226,17 @@ fun RunSenseSpinner(
     }
 }
 
-/** rs-timer — AI 코치가 자동으로 닫히기까지 남은 시간 막대 */
+/** rs-timer — AI 코치가 자동으로 닫히기까지 남은 시간 막대 (한 번만 줄어듭니다) */
 @Composable
 fun AutoDismissBar(
     durationMillis: Int,
     modifier: Modifier = Modifier
 ) {
-    val transition = rememberInfiniteTransition(label = "timer")
-    val fraction by transition.animateFloat(
-        initialValue = 1f,
-        targetValue = 0f,
-        animationSpec = infiniteRepeatable(tween(durationMillis, easing = LinearEasing)),
-        label = "timerFraction"
-    )
+    val fraction = remember { Animatable(1f) }
+    LaunchedEffect(durationMillis) {
+        fraction.snapTo(1f)
+        fraction.animateTo(0f, tween(durationMillis, easing = LinearEasing))
+    }
     Box(
         modifier = modifier
             .height(4.dp)
@@ -228,7 +244,7 @@ fun AutoDismissBar(
     ) {
         Box(
             modifier = Modifier
-                .fillMaxWidth(fraction)
+                .fillMaxWidth(fraction.value.coerceIn(0f, 1f))
                 .height(4.dp)
                 .background(RunSenseGradients.PrimaryAction, CircleShape)
         )
@@ -244,7 +260,7 @@ fun PulsingRing(
     val transition = rememberInfiniteTransition(label = "ring")
     val scale by transition.animateFloat(
         initialValue = 0.9f,
-        targetValue = 1.35f,
+        targetValue = 1.45f,
         animationSpec = infiniteRepeatable(tween(2200, easing = LinearEasing)),
         label = "ringScale"
     )
@@ -264,4 +280,74 @@ fun PulsingRing(
             }
             .background(color.copy(alpha = 0.22f), CircleShape)
     )
+}
+
+/**
+ * 화면 가장자리를 따라 도는 진행 링 (러닝 중 페이스 · 심박 상세 강도).
+ * 원형 워치 베젤 안쪽을 따라 그려져 삼성 헬스 같은 느낌을 냅니다.
+ *
+ * @param progress 0~1. 12시 방향에서 시계 방향으로 찹니다.
+ * @param sweepDegrees 링이 차지하는 최대 각도 (기본 300° — 아래쪽을 비워 둡니다)
+ */
+@Composable
+fun EdgeArc(
+    progress: Float,
+    modifier: Modifier = Modifier,
+    brush: Brush = Brush.sweepGradient(
+        0f to RunSenseColors.Blue500,
+        0.5f to RunSenseColors.Purple700,
+        1f to RunSenseColors.Purple300
+    ),
+    trackColor: Color = Color.White.copy(alpha = 0.08f),
+    strokeWidth: Dp = 5.dp,
+    inset: Dp = 5.dp,
+    sweepDegrees: Float = 300f
+) {
+    val animated by animateFloatAsState(
+        targetValue = progress.coerceIn(0f, 1f),
+        animationSpec = spring(stiffness = Spring.StiffnessLow, dampingRatio = Spring.DampingRatioNoBouncy),
+        label = "edgeArc"
+    )
+    val startAngle = -90f - sweepDegrees / 2f
+    Canvas(modifier = modifier.fillMaxSize()) {
+        val stroke = Stroke(width = strokeWidth.toPx(), cap = StrokeCap.Round)
+        val pad = inset.toPx() + stroke.width / 2f
+        val arcSize = Size(size.width - pad * 2, size.height - pad * 2)
+        val topLeft = Offset(pad, pad)
+        drawArc(
+            color = trackColor,
+            startAngle = startAngle,
+            sweepAngle = sweepDegrees,
+            useCenter = false,
+            topLeft = topLeft,
+            size = arcSize,
+            style = stroke
+        )
+        if (animated > 0f) {
+            drawArc(
+                brush = brush,
+                startAngle = startAngle,
+                sweepAngle = sweepDegrees * animated,
+                useCenter = false,
+                topLeft = topLeft,
+                size = arcSize,
+                style = stroke
+            )
+        }
+    }
+}
+
+/** 처음 나타날 때 살짝 커지며 등장하는 효과 (체크마크·뱃지) */
+@Composable
+fun Modifier.popIn(visible: Boolean = true): Modifier {
+    val scale by animateFloatAsState(
+        targetValue = if (visible) 1f else 0f,
+        animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMedium),
+        label = "popIn"
+    )
+    return this.graphicsLayer {
+        scaleX = scale
+        scaleY = scale
+        alpha = scale.coerceIn(0f, 1f)
+    }
 }

@@ -6,13 +6,16 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavType
 import androidx.navigation.navArgument
 import androidx.wear.compose.navigation.SwipeDismissableNavHost
 import androidx.wear.compose.navigation.composable
 import androidx.wear.compose.navigation.rememberSwipeDismissableNavController
-import com.bmb.runsensewear.presentation.sensor.rememberHeartRate
-import com.bmb.runsensewear.presentation.sensor.rememberHeartRateSensorReady
+import com.bmb.runsensewear.data.run.RunPhase
+import com.bmb.runsensewear.presentation.run.RunEvent
+import com.bmb.runsensewear.presentation.run.RunViewModel
 import com.bmb.runsensewear.presentation.screens.AiCoachScreen
 import com.bmb.runsensewear.presentation.screens.FormSummaryScreen
 import com.bmb.runsensewear.presentation.screens.HeartRateScreen
@@ -45,13 +48,8 @@ object RunSenseRoutes {
      */
     fun aiCoach(autoDismiss: Boolean): String = "ai_coach?$ARG_AUTO_DISMISS=$autoDismiss"
 
-    /**
-     * 심박 센서를 켜 둘 화면들.
-     * 02 센서확인부터 켜 두면 러닝이 시작될 때쯤 첫 측정값이 이미 안정돼 있습니다.
-     */
-    val SensorActiveRoutes: Set<String> = setOf(
-        SENSOR_CHECK, RUNNING, HEART_RATE, FORM_SUMMARY, AI_COACH, PAUSED
-    )
+    /** 러닝 중 가로로 넘기는 페이지들 — 코칭 알림을 자동으로 띄워도 되는 화면 */
+    val RunPages: Set<String> = setOf(RUNNING, HEART_RATE, FORM_SUMMARY)
 }
 
 /**
@@ -59,7 +57,7 @@ object RunSenseRoutes {
  *
  *  01 대기 --[시작]--> 02 센서확인 --[연결완료]--> 03 러닝중
  *  03 러닝중 <-- 스와이프 --> 04 심박상세 <-- 스와이프 --> 05 폼요약 <-- 스와이프 --> 06 AI코치
- *  03 러닝중 --[감지시]--> 06 AI코치 (몇 초 후 자동으로 03으로 복귀)
+ *  03 러닝중 --[코칭 도착]--> 06 AI코치 (몇 초 후 자동으로 03으로 복귀)
  *  03 러닝중 --[일시정지 버튼]--> 07 일시정지
  *  07 일시정지 --[재개]--> 03 러닝중 (뒤로가기)
  *  07 일시정지 --[종료]--> 08 러닝완료 --[확인]--> 01 대기
@@ -67,27 +65,57 @@ object RunSenseRoutes {
  * WearOS 관례상 뒤로가기는 "오른쪽 스와이프로 화면을 밀어서 닫기" 제스처를
  * 쓰기 때문에, 일반 NavHost 대신 SwipeDismissableNavHost를 사용합니다.
  *
- * 각 화면 Composable은 지표 값(거리·심박·폼 점수 등)을 기본값 있는 파라미터로
- * 받습니다. ViewModel이 생기면 여기서 state를 읽어 각 화면에 넘겨주세요.
+ * 모든 지표는 [RunViewModel]의 상태에서 읽어 각 화면에 넘깁니다.
  */
 @Composable
-fun WearNavGraph() {
+fun WearNavGraph(viewModel: RunViewModel = viewModel()) {
     val navController = rememberSwipeDismissableNavController()
+    val ui by viewModel.uiState.collectAsStateWithLifecycle()
 
-    // 러닝 관련 화면에 있을 때만 심박 센서를 켭니다. 대기/완료 화면에서는 꺼서 배터리를 아낍니다.
-    // 스와이프로 화면을 밀어 닫고 나가는 경우까지 잡아야 해서 현재 경로에서 파생시킵니다.
     var currentRoute by remember { mutableStateOf<String?>(null) }
     LaunchedEffect(navController) {
         navController.currentBackStackEntryFlow.collect {
             currentRoute = it.destination.route
         }
     }
-    val sensorActive = currentRoute in RunSenseRoutes.SensorActiveRoutes
 
-    // NavHost 바깥에서 한 번만 구독하므로, 러닝중 ↔ 심박 ↔ 폼요약을 오가도
-    // 센서가 매번 다시 잡히지 않고 존별 체류시간도 이어서 쌓입니다.
-    val heartRate = rememberHeartRate(enabled = sensorActive)
-    val heartRateReady = rememberHeartRateSensorReady()
+    // ViewModel 이벤트 → 화면 전환
+    LaunchedEffect(viewModel) {
+        viewModel.eventFlow.collect { event ->
+            when (event) {
+                RunEvent.RunStarted -> navController.navigate(RunSenseRoutes.RUNNING) {
+                    // 대기화면으로 되돌아가지 않도록 센서확인을 스택에서 제거
+                    popUpTo(RunSenseRoutes.HOME) { inclusive = false }
+                    launchSingleTop = true
+                }
+
+                is RunEvent.CoachingArrived -> {
+                    // 러닝 페이지들 위에 있을 때만 알림을 띄웁니다. 이미 코치 화면이면 내용만 바뀝니다.
+                    if (currentRoute in RunSenseRoutes.RunPages) {
+                        navController.navigate(RunSenseRoutes.aiCoach(autoDismiss = true)) {
+                            launchSingleTop = true
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // 앱이 다시 떴는데 러닝이 진행 중이면(프로세스 복구·대기화면으로 밀려남 등) 바로 러닝 화면으로.
+    LaunchedEffect(Unit) {
+        when (ui.phase) {
+            RunPhase.Running -> navController.navigate(RunSenseRoutes.RUNNING) {
+                popUpTo(RunSenseRoutes.HOME) { inclusive = false }
+            }
+
+            RunPhase.Paused -> {
+                navController.navigate(RunSenseRoutes.RUNNING) { popUpTo(RunSenseRoutes.HOME) { inclusive = false } }
+                navController.navigate(RunSenseRoutes.PAUSED)
+            }
+
+            else -> Unit
+        }
+    }
 
     SwipeDismissableNavHost(
         navController = navController,
@@ -95,56 +123,59 @@ fun WearNavGraph() {
     ) {
         // 01 메인 대기화면
         composable(RunSenseRoutes.HOME) {
+            LaunchedEffect(Unit) { viewModel.refreshSensorReadiness() }
             HomeScreen(
-                onStartRunClick = {
-                    navController.navigate(RunSenseRoutes.SENSOR_CHECK)
-                },
-                heartRateReady = heartRateReady
+                onStartRunClick = { navController.navigate(RunSenseRoutes.SENSOR_CHECK) },
+                insolesConnected = ui.insoleStatus.bothConnected,
+                heartRateReady = ui.heartRateReady,
+                phoneConnected = ui.phoneConnected,
+                userName = ui.userName,
+                runInProgress = ui.phase == RunPhase.Running || ui.phase == RunPhase.Paused,
+                onResumeRunClick = {
+                    navController.navigate(RunSenseRoutes.RUNNING) {
+                        popUpTo(RunSenseRoutes.HOME) { inclusive = false }
+                    }
+                    if (ui.phase == RunPhase.Paused) navController.navigate(RunSenseRoutes.PAUSED)
+                }
             )
         }
 
         // 02 센서 연결 확인 중
         composable(RunSenseRoutes.SENSOR_CHECK) {
             SensorCheckScreen(
-                onAllSensorsConnected = {
-                    // 대기화면으로 되돌아가지 않도록 스택에서 제거하고 이동
-                    navController.navigate(RunSenseRoutes.RUNNING) {
-                        popUpTo(RunSenseRoutes.HOME) { inclusive = false }
-                    }
-                }
+                state = ui.sensorCheck,
+                onEnter = { viewModel.beginSensorCheck() }
             )
         }
 
         // 03 러닝 중 (메인)
         composable(RunSenseRoutes.RUNNING) {
             RunningScreen(
-                onSwipeToHeartRate = {
-                    navController.navigate(RunSenseRoutes.HEART_RATE)
-                },
+                onSwipeToHeartRate = { navController.navigate(RunSenseRoutes.HEART_RATE) },
                 onPauseClick = {
+                    viewModel.pause()
                     navController.navigate(RunSenseRoutes.PAUSED)
                 },
-                onAiCoachTriggered = {
-                    // ViewModel에서 코칭 메시지 생성 이벤트가 오면 이걸 호출
-                    navController.navigate(RunSenseRoutes.aiCoach(autoDismiss = true))
-                },
-                heartRate = heartRate.bpm
+                paceText = ui.paceText,
+                paceState = ui.paceState,
+                currentPaceSecPerKm = ui.currentPaceSecPerKm,
+                paceReferenceSecPerKm = ui.targetPaceSecPerKm ?: ui.avgPaceSecPerKm,
+                distanceKm = ui.distanceKm,
+                elapsedText = ui.elapsedText,
+                heartRate = ui.heartRate,
+                gpsReady = ui.gpsReady
             )
         }
 
         // 04 심박 상세
         composable(RunSenseRoutes.HEART_RATE) {
             HeartRateScreen(
-                onSwipeToFormSummary = {
-                    navController.navigate(RunSenseRoutes.FORM_SUMMARY)
-                },
-                onSwipeBackToRunning = {
-                    navController.popBackStack()
-                },
-                heartRate = heartRate.bpm,
-                currentZone = heartRate.zone,
-                zoneShares = heartRate.zoneShares,
-                statusLabel = heartRate.statusLabel
+                onSwipeToFormSummary = { navController.navigate(RunSenseRoutes.FORM_SUMMARY) },
+                heartRate = ui.heartRate,
+                currentZone = ui.zone,
+                lactateThresholdHr = ui.lthr,
+                zoneShares = ui.zoneShares,
+                statusLabel = ui.heartRateLabel
             )
         }
 
@@ -155,9 +186,10 @@ fun WearNavGraph() {
                     // 마지막 페이지이므로 스스로 닫히지 않게 autoDismiss = false
                     navController.navigate(RunSenseRoutes.aiCoach(autoDismiss = false))
                 },
-                onSwipeBack = {
-                    navController.popBackStack()
-                }
+                formScore = ui.formScore,
+                cadence = ui.cadence,
+                balancePercent = ui.balancePercent,
+                insoleConnected = ui.insoleStatus.leftConnected || ui.insoleStatus.rightConnected
             )
         }
 
@@ -173,11 +205,24 @@ fun WearNavGraph() {
         ) { entry ->
             val autoDismiss = entry.arguments
                 ?.getBoolean(RunSenseRoutes.ARG_AUTO_DISMISS) ?: true
+            var requesting by remember { mutableStateOf(false) }
+            LaunchedEffect(ui.coaching) { requesting = false }
+
             AiCoachScreen(
-                onDismiss = {
-                    navController.popBackStack()
-                },
-                autoDismissMillis = if (autoDismiss) 5000L else null
+                onDismiss = { navController.popBackStack() },
+                message = ui.coaching?.text,
+                focusPoint = ui.coaching?.focusPoint,
+                speaking = ui.speaking,
+                fromPhone = ui.coaching?.fromPhone == true,
+                requesting = requesting,
+                autoDismissMillis = if (autoDismiss) 6000L else null,
+                // 폰 러닝 화면이 열려 있으면 폰이 코칭을 만들어 주므로 워치에서는 요청하지 않습니다.
+                onRequestCoaching = if (!autoDismiss && !ui.phoneRunActive) {
+                    {
+                        requesting = true
+                        viewModel.requestCoachingNow()
+                    }
+                } else null
             )
         }
 
@@ -185,14 +230,18 @@ fun WearNavGraph() {
         composable(RunSenseRoutes.PAUSED) {
             PausedScreen(
                 onResumeClick = {
+                    viewModel.resume()
                     // 러닝중 화면 상태를 그대로 유지한 채 복귀
                     navController.popBackStack()
                 },
                 onStopClick = {
+                    viewModel.finish()
                     navController.navigate(RunSenseRoutes.RUN_COMPLETE) {
                         popUpTo(RunSenseRoutes.HOME) { inclusive = false }
                     }
-                }
+                },
+                elapsedText = ui.elapsedText,
+                distanceKm = ui.distanceKm
             )
         }
 
@@ -200,11 +249,18 @@ fun WearNavGraph() {
         composable(RunSenseRoutes.RUN_COMPLETE) {
             RunCompleteScreen(
                 onDoneClick = {
+                    viewModel.done()
                     // 대기화면까지 스택을 전부 비우고 처음 상태로 복귀
                     navController.navigate(RunSenseRoutes.HOME) {
                         popUpTo(RunSenseRoutes.HOME) { inclusive = true }
                     }
-                }
+                },
+                distanceKm = ui.distanceKm,
+                elapsedText = ui.elapsedText,
+                avgHeartRate = ui.avgHeartRate,
+                saveState = ui.saveState,
+                phoneConnected = ui.phoneConnected,
+                onOpenReportClick = { viewModel.openReportOnPhone() }
             )
         }
     }
