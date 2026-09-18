@@ -215,6 +215,9 @@ class PhoneSyncManager(
 
     fun requestInsoleStatus() = send(PhoneSyncContract.INSOLE_REQUEST, "{}")
 
+    /** 백엔드가 토큰을 거부했을 때 — 폰이 필요하면 재발급해서 /runsense/auth 로 다시 보내 줍니다. */
+    fun requestAuth() = send(PhoneSyncContract.AUTH_REQUEST, "{}")
+
     fun sendRunState(state: String, elapsedSeconds: Int, distanceKm: Double) = send(
         PhoneSyncContract.RUN_STATE,
         """{"state":"$state","elapsedSeconds":$elapsedSeconds,"distanceKm":$distanceKm}"""

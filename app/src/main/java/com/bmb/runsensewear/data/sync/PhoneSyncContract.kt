@@ -24,6 +24,7 @@ package com.bmb.runsensewear.data.sync
  *
  * ── 워치 → 폰 ──────────────────────────────────────────
  *  [INSOLE_REQUEST] 센서 확인 화면에서 현재 인솔 상태를 다시 보내달라고 요청
+ *  [AUTH_REQUEST]   토큰이 거부됐을 때 폰에 최신 토큰 요청 (리프레시 토큰 회전은 폰만 수행)
  *  [RUN_STATE]      { state: started|paused|resumed|ended, elapsedSeconds, distanceKm }
  *  [RUN_LIVE]       { phase, elapsedSeconds, distanceKm, paceSecPerKm, heartRate, cadence, formScore } — 5초마다
  *  [RUN_COMPLETE]   { distanceKm, elapsedSeconds, avgPaceSecPerKm, avgHeartRate, formScore, saved, activityId }
@@ -41,6 +42,8 @@ object PhoneSyncContract {
     const val COACH = "$PATH_PREFIX/coach"
 
     const val INSOLE_REQUEST = "$PATH_PREFIX/insole/request"
+    /** 백엔드가 토큰을 거부했을 때 폰에 최신 토큰(필요하면 재발급)을 요청 */
+    const val AUTH_REQUEST = "$PATH_PREFIX/auth/request"
     const val RUN_STATE = "$PATH_PREFIX/run/state"
     const val RUN_LIVE = "$PATH_PREFIX/run/live"
     const val RUN_COMPLETE = "$PATH_PREFIX/run/complete"

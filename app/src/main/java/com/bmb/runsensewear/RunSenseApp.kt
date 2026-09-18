@@ -30,6 +30,11 @@ class AppContainer(app: Application) {
     val coachingRepository = CoachingRepository(network, tokenStore)
     val runRepository = RunRepository(app, network, tokenStore, appScope)
     val voicePlayer = CoachVoicePlayer(app, appScope)
+
+    init {
+        // 토큰이 거부되면 워치가 직접 재발급하지 않고 폰에 새 토큰을 요청합니다 (리프레시 토큰 충돌 방지).
+        network.onAuthRejected = { phoneSyncManager.requestAuth() }
+    }
     val runCoordinator = RunCoordinator(
         context = app,
         scope = appScope,
