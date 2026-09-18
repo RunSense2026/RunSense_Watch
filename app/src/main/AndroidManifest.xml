@@ -3,13 +3,20 @@
 
     <uses-permission android:name="android.permission.WAKE_LOCK" />
 
+    <!-- 런센스 백엔드 / AI 코칭 서버 호출. 워치는 페어링된 폰의 인터넷을 블루투스로 공유받습니다. -->
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+
     <!--
-        워치 내장 심박 센서 (Health Services MeasureClient).
+        워치 내장 심박 센서 (Health Services).
         Wear OS 6(API 36)부터 BODY_SENSORS가 health 권한으로 대체되어 둘 다 선언합니다.
         https://developer.android.com/training/wearables/versions/6/changes
     -->
     <uses-permission
         android:name="android.permission.BODY_SENSORS"
+        android:maxSdkVersion="35" />
+    <uses-permission
+        android:name="android.permission.BODY_SENSORS_BACKGROUND"
         android:maxSdkVersion="35" />
     <uses-permission android:name="android.permission.health.READ_HEART_RATE" />
     <!-- 걸음/러닝 감지, 케이던스 등 모션 기반 지표 -->
@@ -20,15 +27,22 @@
     <!-- 화면이 꺼진 상태에서도 러닝을 계속 추적하기 위한 포그라운드 서비스 -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_HEALTH" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION" />
     <!-- 포그라운드 서비스 알림 (Android 13+) -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <!-- AI 코치 음성 안내 중 화면이 꺼져도 재생이 끊기지 않도록 -->
+    <uses-permission android:name="android.permission.VIBRATE" />
 
     <uses-feature android:name="android.hardware.type.watch" />
     <uses-feature
         android:name="android.hardware.sensor.heartrate"
         android:required="false" />
+    <uses-feature
+        android:name="android.hardware.location.gps"
+        android:required="false" />
 
     <application
+        android:name=".RunSenseApp"
         android:allowBackup="true"
         android:icon="@mipmap/ic_launcher"
         android:label="@string/app_name"
@@ -42,8 +56,8 @@
             android:required="false" />
 
         <!--
-               Set to true if your app is Standalone, that is, it does not require the handheld
-               app to run.
+            폰 앱 없이도 러닝 추적·AI 코칭이 동작합니다(standalone).
+            폰 앱이 있으면 로그인 토큰·인솔 데이터를 Data Layer로 받아 기능이 확장됩니다.
         -->
         <meta-data
             android:name="com.google.android.wearable.standalone"
@@ -52,6 +66,7 @@
         <activity
             android:name=".presentation.MainActivity"
             android:exported="true"
+            android:launchMode="singleTask"
             android:taskAffinity=""
             android:theme="@style/MainActivityTheme.Starting">
             <intent-filter>
@@ -60,6 +75,29 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <!-- 러닝 중 화면이 꺼져도 Health Services 업데이트를 계속 받기 위한 포그라운드 서비스 -->
+        <service
+            android:name=".data.exercise.RunTrackingService"
+            android:exported="false"
+            android:foregroundServiceType="health|location" />
+
+        <!--
+            폰 앱이 보내는 로그인 토큰 / 인솔 상태를 앱이 꺼져 있어도 받아 저장합니다.
+            폰 앱과 이 앱은 같은 applicationId · 같은 서명이어야 Data Layer가 연결됩니다.
+        -->
+        <service
+            android:name=".data.sync.PhoneDataListenerService"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="com.google.android.gms.wearable.DATA_CHANGED" />
+                <action android:name="com.google.android.gms.wearable.MESSAGE_RECEIVED" />
+                <data
+                    android:host="*"
+                    android:pathPrefix="/runsense"
+                    android:scheme="wear" />
+            </intent-filter>
+        </service>
     </application>
 
 </manifest>

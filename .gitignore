@@ -100,3 +100,5 @@ ehthumbs.db
 Desktop.ini
 # Linux
 *~
+# 워치·폰 앱 공용 디버그 서명 키 (Data Layer 연동을 위해 두 앱이 같은 키를 씁니다)
+!runsense-debug.keystore
