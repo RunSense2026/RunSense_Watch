@@ -82,6 +82,12 @@
             android:exported="false"
             android:foregroundServiceType="health|location" />
 
+        <!-- 폰에서 러닝하는 동안 워치 심박을 폰으로 보내는 포그라운드 서비스 -->
+        <service
+            android:name=".data.sensor.PhoneHeartRateService"
+            android:exported="false"
+            android:foregroundServiceType="health" />
+
         <!--
             폰 앱이 보내는 로그인 토큰 / 인솔 상태를 앱이 꺼져 있어도 받아 저장합니다.
             폰 앱과 이 앱은 같은 applicationId · 같은 서명이어야 Data Layer가 연결됩니다.

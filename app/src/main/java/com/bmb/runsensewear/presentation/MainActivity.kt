@@ -11,6 +11,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
+import com.bmb.runsensewear.RunSenseApp
 import com.bmb.runsensewear.data.sensor.HeartRatePermission
 import com.bmb.runsensewear.presentation.navigation.WearNavGraph
 import com.bmb.runsensewear.presentation.theme.RunSenseWearTheme
@@ -42,6 +43,12 @@ class MainActivity : ComponentActivity() {
         setContent {
             WearApp()
         }
+    }
+
+    override fun onResume() {
+        super.onResume()
+        // 백그라운드라 심박 전송 서비스를 못 띄웠던 경우, 앱이 열리면 다시 시도합니다.
+        (application as RunSenseApp).container.phoneHeartRateRelay.ensureRunning()
     }
 }
 

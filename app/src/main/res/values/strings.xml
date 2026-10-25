@@ -3,4 +3,7 @@
     <string name="tracking_channel_name">러닝 추적</string>
     <string name="tracking_notification_title">러닝 추적 중</string>
     <string name="tracking_notification_text">런센스가 거리·페이스·심박을 기록하고 있어요</string>
+    <string name="phone_hr_channel_name">폰 러닝 심박 전송</string>
+    <string name="phone_hr_notification_title">폰 러닝 중</string>
+    <string name="phone_hr_notification_text">워치 심박을 폰으로 보내고 있어요</string>
 </resources>

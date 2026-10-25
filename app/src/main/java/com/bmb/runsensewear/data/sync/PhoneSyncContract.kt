@@ -27,6 +27,8 @@ package com.bmb.runsensewear.data.sync
  *  [AUTH_REQUEST]   토큰이 거부됐을 때 폰에 최신 토큰 요청 (리프레시 토큰 회전은 폰만 수행)
  *  [RUN_STATE]      { state: started|paused|resumed|ended, elapsedSeconds, distanceKm }
  *  [RUN_LIVE]       { phase, elapsedSeconds, distanceKm, paceSecPerKm, heartRate, cadence, formScore } — 5초마다
+ *  [HEART_RATE]     { heartRate, state } — 폰 러닝 중(RUN_PHONE active) 워치에서 러닝을 시작하지 않아도
+ *                   심박이 바뀔 때마다(같아도 2초마다) 보냅니다. 측정 전/손목 이탈이면 heartRate 0.
  *  [RUN_COMPLETE]   { distanceKm, elapsedSeconds, avgPaceSecPerKm, avgHeartRate, formScore, saved, activityId }
  *  [OPEN_REPORT]    { activityId } — 완료 화면 카드를 누르면 폰 앱 리포트 열기
  */
@@ -46,6 +48,7 @@ object PhoneSyncContract {
     const val AUTH_REQUEST = "$PATH_PREFIX/auth/request"
     const val RUN_STATE = "$PATH_PREFIX/run/state"
     const val RUN_LIVE = "$PATH_PREFIX/run/live"
+    const val HEART_RATE = "$PATH_PREFIX/hr"
     const val RUN_COMPLETE = "$PATH_PREFIX/run/complete"
     const val OPEN_REPORT = "$PATH_PREFIX/open_report"
 
