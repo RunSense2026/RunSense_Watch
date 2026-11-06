@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- 폰 앱이 CapabilityClient로 워치 앱 설치 여부를 찾을 때 쓰는 이름 -->
+    <string-array name="android_wear_capabilities">
+        <item>runsense_watch_app</item>
+    </string-array>
+</resources>
